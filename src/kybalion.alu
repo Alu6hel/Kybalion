@@ -129,9 +129,22 @@ routine kybalion_drop_partition(date_str) {
 // 8. KQL (Kybalion Query Language) & Graph Parser
 // ==========================================
 import kybalion::graph
+import kybalion::hnsw
 
-routine kql_execute(fd, query_string) {
+routine kql_execute(fd, query_string, vector_payload: ptr<f32>) {
     print("[Kybalion KQL] Parsing Query: ", query_string)
+    
+    // AI Vector Search
+    if (string_contains(query_string, "VECTOR_MATCH")) {
+        print("[Kybalion KQL] Detected Vector Search Query. Routing to HNSW Neural Index.")
+        let nearest_ids = hnsw_search(vector_payload, 1) // Get top 1 match
+        
+        // Let's assume ID 0x9999 represents known Ransomware Family X
+        if (nearest_ids[0] == 0x9999) {
+            return "{ \"threat_detected\": true, \"confidence\": 0.98, \"family\": \"Ransomware\" }"
+        }
+        return "{ \"threat_detected\": false }"
+    }
     
     if (string_starts_with(query_string, "MATCH")) {
         // Route to Graph Engine
