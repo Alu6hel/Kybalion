@@ -53,7 +53,7 @@ routine btree_search(key) {
 }
 
 // ==========================================
-// 5. Advanced Query Interface
+// 5. Advanced Query Interface (Homomorphic ZKP Support)
 // ==========================================
 routine db_insert(fd, key, record_data, length, tx_id) {
     // 1. Validate Schema / Strict Typing
@@ -68,13 +68,23 @@ routine db_insert(fd, key, record_data, length, tx_id) {
     btree_insert(key, offset)
 }
 
-routine db_query(fd, search_key) {
+routine db_query(fd, search_key, use_zkp: bool) {
     let disk_offset = btree_search(search_key)
     if (disk_offset == 0x0) { return null }
     
-    // Read and Decrypt
     let encrypted_record = alloc(PAGE_SIZE)
     file_read_at(fd, disk_offset, encrypted_record, PAGE_SIZE)
+    
+    if (use_zkp) {
+        // Evaluate the search on the ciphertext natively without decrypting
+        let encrypted_token = homomorphic_encrypt(search_key, get_public_key())
+        let match_found = homomorphic_evaluate_equality(encrypted_record, encrypted_token)
+        if (match_found) {
+            print("[Kybalion ZKP] Match proven on ciphertext.")
+            return encrypted_record
+        }
+        return null
+    }
     
     return decrypt_page(encrypted_record)
 }
@@ -97,10 +107,36 @@ routine wal_append(tx_id, key, disk_offset) {
 }
 
 // ==========================================
-// 7. KQL (Kybalion Query Language) Parser
+// 7. Time-Series Partitioning
 // ==========================================
+routine db_init_timeseries(base_dir) {
+    // Automatically shards data into daily files
+    let date_str = get_system_date_string() // e.g. "2026_07_27"
+    let filepath = base_dir + "\\telemetry_" + date_str + ".kyb"
+    
+    print("[Kybalion Partition] Opening Time-Series Partition: ", filepath)
+    return file_open(filepath, O_CREAT | O_APPEND | O_RDWR)
+}
+
+routine kybalion_drop_partition(date_str) {
+    // O(1) Instant deletion of old data without B-Tree compaction
+    let filepath = "C:\\Aegis\\telemetry_" + date_str + ".kyb"
+    file_delete(filepath)
+    print("[Kybalion Partition] Dropped partition: ", date_str, " in O(1) time.")
+}
+
+// ==========================================
+// 8. KQL (Kybalion Query Language) & Graph Parser
+// ==========================================
+import kybalion::graph
+
 routine kql_execute(fd, query_string) {
     print("[Kybalion KQL] Parsing Query: ", query_string)
+    
+    if (string_starts_with(query_string, "MATCH")) {
+        // Route to Graph Engine
+        return graph_match_traversal(query_string)
+    }
     
     // Extremely lightweight syntax parser
     // Example: "SELECT * FROM threats WHERE type = 'RANSOMWARE'"
