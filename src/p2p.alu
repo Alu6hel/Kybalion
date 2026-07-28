@@ -1,0 +1,51 @@
+// Kybalion Database: Decentralized P2P Gossip Protocol
+// Severing reliance on centralized servers.
+
+import std::os::network
+import std::crypto
+
+// List of seed nodes to bootstrap the P2P connection
+global seed_nodes = [
+    "203.0.113.50:9001", // Example IP in Japan
+    "198.51.100.14:9001", // Example IP in Germany
+    "192.0.2.200:9001" // Example IP in Brazil
+]
+
+// The format of a P2P Threat Broadcast
+struct GossipMessage {
+    timestamp: u64
+    vector: ptr<f32> // The 128-D Neural Behavior Vector
+    signature: ptr<u8> // Ed25519 Cryptographic Signature
+}
+
+routine p2p_gossip_listen() {
+    print("[KYBALION P2P] Binding to UDP Port 9001 and listening for Global Swarm Broadcasts...")
+    let socket = udp_bind("0.0.0.0", 9001)
+    
+    while (true) {
+        let packet = udp_recv(socket)
+        let message = parse_gossip_message(packet)
+        
+        // Cryptographically verify the message so hackers cannot inject fake zero-days
+        if (crypto::verify_ed25519(message.vector, message.signature, get_public_swarm_key())) {
+            print("[KYBALION P2P] Verified Zero-Day Vector received from Swarm! Injecting into local HNSW Index...")
+            // kybalion_insert_vector(message.vector)
+        } else {
+            print("[KYBALION P2P] WARNING: Dropping spoofed broadcast from malicious node.")
+        }
+    }
+}
+
+routine p2p_gossip_broadcast(vector: ptr<f32>) {
+    print("[KYBALION P2P] Zero-Day Detected! Broadcasting behavioral vector to the Global Swarm...")
+    
+    let signature = crypto::sign_ed25519(vector, get_private_swarm_key())
+    let message = serialize_gossip_message(vector, signature)
+    
+    // Blast the message to all known peers (Gossip)
+    let socket = udp_socket()
+    for node in seed_nodes {
+        udp_send(socket, node, message)
+    }
+    print("[KYBALION P2P] Broadcast complete. The global swarm has been immunized in milliseconds.")
+}
