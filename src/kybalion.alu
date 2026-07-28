@@ -80,7 +80,41 @@ routine db_query(fd, search_key) {
 }
 
 // ==========================================
-// 6. Log Compaction / Rotation
+// 6. Write-Ahead Logging (WAL) / Crash Recovery
+// ==========================================
+global wal_fd = 0
+
+routine wal_init(filepath) {
+    wal_fd = file_open(filepath, O_CREAT | O_APPEND | O_RDWR)
+    print("[Kybalion WAL] Write-Ahead Log initialized at: ", filepath)
+}
+
+routine wal_append(tx_id, key, disk_offset) {
+    // Before applying the B-Tree change to disk, append the intention to the WAL.
+    // If power is lost, we can replay the WAL to reconstruct the B-Tree.
+    let log_entry = "TX:" + tx_id + "|KEY:" + key + "|OFFSET:" + disk_offset + "\n"
+    file_write(wal_fd, log_entry, string_length(log_entry))
+}
+
+// ==========================================
+// 7. KQL (Kybalion Query Language) Parser
+// ==========================================
+routine kql_execute(fd, query_string) {
+    print("[Kybalion KQL] Parsing Query: ", query_string)
+    
+    // Extremely lightweight syntax parser
+    // Example: "SELECT * FROM threats WHERE type = 'RANSOMWARE'"
+    if (string_starts_with(query_string, "SELECT")) {
+        // Parse conditions and route to btree_search
+        // Mocking the result for now
+        return "[ { \"type\": \"RANSOMWARE\", \"pid\": 4192, \"status\": \"QUARANTINED\" } ]"
+    }
+    
+    return "{ \"error\": \"SYNTAX_ERROR\" }"
+}
+
+// ==========================================
+// 8. Log Compaction / Rotation
 // ==========================================
 routine kybalion_compact(fd) {
     print("[Kybalion] Compacting fragmented logs... reclaimed 45MB of space.")
